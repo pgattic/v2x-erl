@@ -1,39 +1,58 @@
 -module(messenger).
--export([start/0, start/1, send_message/2, receive_message/0]).
+-behaviour(gen_server).
 
-%% Starts the messenger server on the current node
-start() ->
-    register(messenger, spawn(fun loop/0)),
-    io:format("Messenger started on ~p~n", [node()]).
+%% API
+-export([start_link/0, send_message/2, receive_message/1]).
 
-%% Starts the messenger server and registers it with a specific name
-start(Name) ->
-    register(Name, spawn(fun loop/0)),
-    io:format("Messenger ~p started on ~p~n", [Name, node()]).
+%% Callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-%% Sends a message to a process on another node
+%% Starts the gen_server process
+start_link() ->
+    gen_server:start_link({local, messenger}, messenger, [], []).
+
+%% Sends a message to a remote node
 send_message(RemoteNode, Message) ->
-    %% The remote node must have started the `messenger` process.
-    {messenger, RemoteNode} ! {self(), Message},
-    io:format("Message sent to ~p: ~p~n", [RemoteNode, Message]).
+    %% Assumes the messenger gen_server is running on the remote node
+    gen_server:call({messenger, RemoteNode}, {send_message, Message}).
 
-%% Waits to receive a message
-receive_message() ->
-    receive
-        {From, Message} ->
-            io:format("Message received from ~p: ~p~n", [From, Message])
-    after 10000 -> %% Timeout after 10 seconds
-        io:format("No message received~n")
-    end.
+%% Handles receiving a message
+receive_message(Pid) ->
+    gen_server:call(Pid, get_message).
 
-%% Internal loop for the messenger process
-loop() ->
-    receive
-        {From, Message} ->
-            io:format("Received message: ~p from ~p~n", [Message, From]),
-            From ! {self(), "Message received!"};
-        _ ->
-            io:format("Unknown message received~n")
-    end,
-    loop().
+%% Callbacks
+
+%% Initialize the server state
+init([]) ->
+    io:format("Messenger started on ~p~n", [node()]),
+    {ok, []}.
+
+%% Handle synchronous calls
+handle_call({send_message, Message}, _From, State) ->
+    io:format("Received message: ~p~n", [Message]),
+    {reply, ok, State};
+
+handle_call(get_message, _From, State) ->
+    %% For simplicity, this example doesn't keep messages.
+    %% You can expand this to maintain a message queue in the State.
+    {reply, "No new messages", State};
+
+handle_call(_Request, _From, State) ->
+    {reply, error, State}.
+
+%% Handle asynchronous messages
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+%% Handle other messages
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+%% Cleanup on termination
+terminate(_Reason, _State) ->
+    ok.
+
+%% Code change (hot upgrades)
+code_change(_OldVersion, State, _Extra) ->
+    {ok, State}.
 
