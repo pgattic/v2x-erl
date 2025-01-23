@@ -2,7 +2,7 @@
  
 -behavior(gen_server).
  
--export([start_link/0, update_position/2, get_position/1, get_all_data/1, remove_vehicle/1]).
+-export([start_link/0, update_position/2, get_position/1, get_history/1, remove_vehicle/1]).
  
 -export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
 
@@ -27,8 +27,8 @@ update_position(Key, Value) ->
 get_position(Key) ->
     gen_server:call(?MODULE, {get_position, Key}).
 
--spec get_all_data(string()) -> {ok, [car_state()]} | {error, no_data}.
-get_all_data(Key) ->
+-spec get_history(string()) -> {ok, [car_state()]} | {error, no_data}.
+get_history(Key) ->
     gen_server:call(?MODULE, {get_all_data, Key}).
  
 -spec remove_vehicle(string()) -> ok.
