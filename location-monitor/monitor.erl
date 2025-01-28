@@ -4,9 +4,10 @@
 -export([start_link/0, update_position/2, get_position/1, get_history/1, delete_history/1]).
 -export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
 
--type position() :: {number, number}.
--type car_state() :: {calendar:datetime(), position()}.
 -type server_state() :: #{string() => [car_state()]}.
+-type car_state() :: {calendar:datetime(), position()}.
+-type position() :: {number, number}.
+
  
 %% API (user-facing) functions
 
@@ -46,8 +47,7 @@ handle_cast({update_position, Name, Position}, State) ->
     end;
  
 handle_cast({delete_history, Name}, State) ->
-    NewState = maps:remove(Name, State),
-    {noreply, NewState}.
+    {noreply, maps:remove(Name, State)}.
  
 -spec handle_call({get_position, string()} | {get_history, string()}, _, server_state()) -> {reply, {ok, car_state() | [car_state()]} | {error, no_data}, server_state()}.
 handle_call({get_position, Name}, _From, State) ->
