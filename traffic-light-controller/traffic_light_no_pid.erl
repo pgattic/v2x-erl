@@ -1,4 +1,4 @@
--module(traffic_light).
+-module(traffic_light_no_pid).
 -behaviour(gen_statem).
 
 %% API
