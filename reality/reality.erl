@@ -1,56 +1,67 @@
 -module(reality).
 -behaviour(gen_server).
 
-%%% ================================================================================================
+%%% ==================================================================
 %%%
 %%% REALITY module
 %%%
-%%% In a real-life v2x system, there is an aspect of communication that is not explicitly managed in
-%%% software. That is, communication through the environment. This includes seeing, radio signaling,
+%%% In a real-life v2x system, there is an aspect of communication
+%%% that is not explicitly managed in software. That is, communication
+%%% through the environment. This includes seeing, radio signaling,
 %%% and normal force.
 %%%
-%%% Since our v2x system is not deployed on actual hardware, that type of communication must still
-%%% be handled in software. Thus, the purpose of this process is to emulate those methods of
+%%% Since our v2x system is not deployed on actual hardware, that type
+%%% of communication must still be handled in software. Thus, the
+%%% purpose of this process is to emulate those methods of
 %%% communication. When something sees, it sees through reality.
 %%%
-%%% ================================================================================================
+%%% ==================================================================
 
 %% API
--export([start_link/0, report_position/3, get_state/0, see/2]).
+-export([start_link/0, report_position/3, see/2]).
 
 %% gen_server callbacks
--export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_cast/2, handle_call/3, terminate/2, code_change/3]).
+
+-type server_state() :: #{
+  pid() => {atom(), position()}
+}.
+-type position() :: {number(), number()}.
 
 %%%===================================================================
 %%% API Functions
 %%%===================================================================
 
 %% Starts the gen_server and registers it as 'reality'
+-spec start_link() -> gen_server:start_ret().
 start_link() ->
   gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% Sends a report_position containing the entity type, its pid, and its position.
+%% Sends a report_position containing the entity type, its pid, and
+%% its position.
+%% This function should be invoked as often as possible for any entity
+%% whose position is relevant to the simulation.
+-spec report_position(atom(), pid(), position()) -> ok.
 report_position(Type, Pid, Pos) ->
   gen_server:cast(?MODULE, {report_position, Type, Pid, Pos}).
 
-%% Retrieves the current state (a map of Pid to {Type, Pos})
-get_state() ->
-  gen_server:call(?MODULE, get_state).
-
-%% The "see" API receives a position and a radius, and returns all entities within that radius.
+%% The "see" API receives a position and a radius, and returns all
+%% entities within that radius.
 %% Assumes positions are in 2D: {X, Y}
-see({X, Y} = Pos, Radius) ->
+-spec see(position(), number()) -> [{atom(), position()}].
+see(Pos, Radius) ->
   gen_server:call(?MODULE, {see, Pos, Radius}).
 
 %%%===================================================================
 %%% gen_server Callbacks
 %%%===================================================================
 
+%% Initialize with an empty map: #{Pid => {Type, Pos}}
 init([]) ->
-  %% Initialize with an empty map: #{Pid => {Type, Pos}}
   {ok, #{}}.
 
 %% Handle incoming report_positions by updating the map with the latest data.
+-spec handle_cast({report_position, atom(), pid(), position()}, server_state()) -> {noreply, server_state()}.
 handle_cast({report_position, Type, Pid, Pos}, State) ->
   io:format("Received report_position from ~p: ~p, ~p~n", [Type, Pid, Pos]),
   NewState = State#{Pid => {Type, Pos}},
@@ -58,11 +69,9 @@ handle_cast({report_position, Type, Pid, Pos}, State) ->
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-%% Handle synchronous calls.
-handle_call(get_state, _From, State) ->
-  {reply, State, State};
-
-%% For "see" requests, filter entities by checking if their squared distance is less than or equal to Radius*Radius.
+%% For "see" requests, filter entities by checking if their squared
+%% distance is less than or equal to Radius*Radius.
+%-spec handle_call({see, position(), number()}, pid(), server_state()) -> {reply, [{pid(), atom(), position()}] | ok, server_state()}.
 handle_call({see, Pos, Radius}, _From, State) ->
   Entities = maps:fold(
                fun(Pid, {Type, EntityPos}, Acc) ->
@@ -75,9 +84,7 @@ handle_call({see, Pos, Radius}, _From, State) ->
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
-handle_info(_Info, State) ->
-  {noreply, State}.
-
+-spec terminate(string(), server_state()) -> ok.
 terminate(_Reason, _State) ->
   ok.
 
@@ -89,6 +96,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% Computes the Euclidean distance between two 2D positions.
+-spec distance(position(), position()) -> number().
 distance({X1, Y1}, {X2, Y2}) ->
   math:sqrt(math:pow(X2 - X1, 2) + math:pow(Y2 - Y1, 2)).
 
