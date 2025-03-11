@@ -69,13 +69,7 @@ handle_cast(_Msg, State) ->
 %% distance is less than or equal to Radius*Radius.
 %-spec handle_call({see, position(), number()}, pid(), server_state()) -> {reply, [{pid(), atom(), position()}] | ok, server_state()}.
 handle_call({see, Pos, Radius}, _From, State) ->
-  Entities = maps:fold(
-               fun(Pid, {Type, EntityPos}, Acc) ->
-                   case distance(EntityPos, Pos) =< Radius of
-                     true -> [{Pid, Type, EntityPos} | Acc];
-                     false -> Acc
-                   end
-               end, [], State),
+  Entities = see_helper(State, Pos, Radius),
   {reply, Entities, State};
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
@@ -96,6 +90,17 @@ code_change(_OldVsn, State, _Extra) ->
 distance({X1, Y1}, {X2, Y2}) ->
   math:sqrt(math:pow(X2 - X1, 2) + math:pow(Y2 - Y1, 2)).
 
+-spec see_helper(server_state(), position(), number()) -> [{pid(), atom(), position()}].
+see_helper(State, Pos, Radius) ->
+  maps:fold(
+    fun(Pid, {Type, EntityPos}, Acc) ->
+      case distance(EntityPos, Pos) =< Radius of
+        true -> [{Pid, Type, EntityPos} | Acc];
+        false -> Acc
+      end
+    end, [], State).
+
+
 %%%===================================================================
 %%% Unit Tests
 %%%===================================================================
@@ -105,9 +110,24 @@ distance({X1, Y1}, {X2, Y2}) ->
 
 distance_test_() ->
   [
-    ?_assertEqual(distance({0, 0}, {4, 3}), 5.0)
+    ?_assertEqual(distance({0, 0}, {4, 3}), 5.0),
+    ?_assertEqual(distance({0, 0}, {1, 1}), math:sqrt(2))
+  ].
+
+see_test_() ->
+  State = #{
+    my_car_1 => {car, {45, 37}},
+    my_car_2 => {car, {26, 43}},
+    guy_1 => {person, {69, 420}},
+    guy_2 => {person, {27, 44}}
+  },
+
+  [
+    ?_assertEqual(see_helper(State, {48, 37}, 5), [{my_car_1, car, {45, 37}}]),
+    ?_assertEqual(see_helper(State, {48, 37}, 1), []),
+    ?_assertEqual(lists:member({my_car_2, car, {26, 43}}, see_helper(State, {26, 44}, 3)), true),
+    ?_assertEqual(lists:member({guy_2, person, {27, 44}}, see_helper(State, {26, 44}, 3)), true)
   ].
 
 -endif.
-
 
