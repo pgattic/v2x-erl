@@ -1,0 +1,14 @@
+{application, reality, [
+    {description, "Reality simulator for v2x system"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {reality_app, []}},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["MIT"]},
+    {links, []}
+ ]}.

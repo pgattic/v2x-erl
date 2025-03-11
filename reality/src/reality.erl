@@ -1,21 +1,17 @@
+%%% ==================================================================
+%% @doc
+%%
+%% REALITY module
+%%
+%% In a real-life v2x system, there is an aspect of communication that is not explicitly managed in software. That is, communication through the environment. This includes seeing, radio signaling, and normal force.
+%%
+%% Since our v2x system is not deployed on actual hardware, that type of communication must still be handled in software. Thus, the purpose of this process is to emulate those methods of communication. When something sees, it sees through reality.
+%%
+%% @end
+%%% ==================================================================
+
 -module(reality).
 -behaviour(gen_server).
-
-%%% ==================================================================
-%%%
-%%% REALITY module
-%%%
-%%% In a real-life v2x system, there is an aspect of communication
-%%% that is not explicitly managed in software. That is, communication
-%%% through the environment. This includes seeing, radio signaling,
-%%% and normal force.
-%%%
-%%% Since our v2x system is not deployed on actual hardware, that type
-%%% of communication must still be handled in software. Thus, the
-%%% purpose of this process is to emulate those methods of
-%%% communication. When something sees, it sees through reality.
-%%%
-%%% ==================================================================
 
 %% API
 -export([start_link/0, report_position/3, see/2]).
@@ -99,4 +95,19 @@ code_change(_OldVsn, State, _Extra) ->
 -spec distance(position(), position()) -> number().
 distance({X1, Y1}, {X2, Y2}) ->
   math:sqrt(math:pow(X2 - X1, 2) + math:pow(Y2 - Y1, 2)).
+
+%%%===================================================================
+%%% Unit Tests
+%%%===================================================================
+
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+
+distance_test_() ->
+  [
+    ?_assertEqual(distance({0, 0}, {4, 3}), 5.0)
+  ].
+
+-endif.
+
 
