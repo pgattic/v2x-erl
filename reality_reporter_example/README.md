@@ -11,6 +11,6 @@ In the system that you want to talk to `reality`:
 
 - `cd reality_reporter_example`
 - `rebar3 shell --name yeet@164.92.90.193 --setcookie elvenmage`
-- To report: `reality_reporter_example:report_position_over_internet({69, 420}).`
+- To report: `reality_reporter_example:report_position({69, 420}).`
 - To "see": `reality_reporter_example:see({68, 415}, 20).`
 
