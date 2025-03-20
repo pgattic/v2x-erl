@@ -9,3 +9,5 @@ Since our v2x system is not deployed on actual hardware, that type of communicat
 
 `rebar3 compile`
 
+For an example of running this and communicating to it from another remote process, please see `/reality_reporter_example/README.md`.
+

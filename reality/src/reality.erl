@@ -44,7 +44,7 @@ report_position(Type, Pid, Pos) ->
 %% The "see" API receives a position and a radius, and returns all
 %% entities within that radius.
 %% Assumes positions are in 2D: {X, Y}
--spec see(position(), number()) -> [{atom(), position()}].
+-spec see(position(), number()) -> [{atom(), position()}] | term().
 see(Pos, Radius) ->
   gen_server:call(?MODULE, {see, Pos, Radius}).
 
@@ -59,7 +59,7 @@ init([]) ->
 %% Handle incoming report_positions by updating the map with the latest data.
 -spec handle_cast({report_position, atom(), pid(), position()}, server_state()) -> {noreply, server_state()}.
 handle_cast({report_position, Type, Pid, Pos}, State) ->
-  io:format("Received report_position from ~p: ~p, ~p~n", [Type, Pid, Pos]),
+  io:format("Received 'report_position' from ~p: ~p, ~p~n", [Type, Pid, Pos]),
   NewState = State#{Pid => {Type, Pos}},
   {noreply, NewState};
 handle_cast(_Msg, State) ->
@@ -69,6 +69,7 @@ handle_cast(_Msg, State) ->
 %% distance is less than or equal to Radius*Radius.
 %-spec handle_call({see, position(), number()}, pid(), server_state()) -> {reply, [{pid(), atom(), position()}] | ok, server_state()}.
 handle_call({see, Pos, Radius}, _From, State) ->
+  io:format("Received 'see' from position ~p with radius ~p~n", [Pos, Radius]),
   Entities = see_helper(State, Pos, Radius),
   {reply, Entities, State};
 handle_call(_Request, _From, State) ->
