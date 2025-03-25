@@ -71,3 +71,41 @@ doors_open(cast, close_doors, Data) ->
 doors_open(Type, Event, Data) ->
     io:format("Event ~p not valid with doors open~n", [{Type, Event}]),
     {keep_state, Data}.
+
+
+-include_lib("eunit/include/eunit.hrl").
+
+    tram_test_() ->
+        {
+            setup,
+            fun setup/0,
+            fun cleanup/1,
+            fun test_sequence/1
+        }.
+    
+    setup() ->
+        {ok, Pid} = tram_statem:start_link(),
+        Pid.
+    
+    cleanup(_Pid) ->
+        ok.
+    
+    test_sequence(_Pid) ->
+        ?assertEqual(ok, tram_statem:open_doors()),
+        timer:sleep(100),
+    
+        ?assertEqual(ok, tram_statem:close_doors()),
+        timer:sleep(100),
+    
+        ?assertEqual(ok, tram_statem:start()),
+        timer:sleep(100),
+    
+        ?assertEqual(ok, tram_statem:stop()),
+        timer:sleep(100),
+    
+        ?assertEqual(ok, tram_statem:start()),
+        timer:sleep(100),
+        ?assertEqual(ok, tram_statem:open_doors()),
+        timer:sleep(100),
+        tram:stop().
+    
