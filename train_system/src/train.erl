@@ -22,9 +22,12 @@
 -behaviour(gen_server).
 
 %% API Functions
--export([start/1, stop/1, accelerate/2, decelerate/2, 
-         set_destination/2, board_passengers/2, depart_passengers/2, 
-         get_state/1, start_link/1]).
+-export([
+    start/1, stop/1, accelerate/2, decelerate/2, 
+    set_destination/2, board_passengers/2, depart_passengers/2, 
+    get_state/1, start_link/1,
+    report_position/1, see/2
+]).
 
 %% gen_server Callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -140,6 +143,30 @@ depart_passengers(Pid, NumPassengers) ->
 get_state(Pid) -> 
     gen_server:call(Pid, get_state).
 
+%%%-------------------------------------------------------------------
+%%% @doc
+%%% Reports the train's current position to the reality system.
+%%% @param Position The current position.
+%%% @returns ok.
+%%%-------------------------------------------------------------------
+report_position(Position) ->
+    Result = rpc:cast('v2xmage@164.92.104.30', reality, report_position, [train, self(), Position]),
+    io:format("Remote report_position result: ~p~n", [Result]),
+    Result.
+
+%%%-------------------------------------------------------------------
+%%% @doc
+%%% Queries visible objects around a given position.
+%%% @param Position The center point.
+%%% @param Radius The radius to see.
+%%% @returns List of visible entities.
+%%%-------------------------------------------------------------------
+see(Position, Radius) ->
+    Result = rpc:call('v2xmage@164.92.104.30', reality, see, [Position, Radius]),
+    io:format("Remote see result: ~p~n", [Result]),
+    Result.
+
+
 %%% ==================================================================
 %%%                        GEN_SERVER CALLBACKS
 %%% ==================================================================
@@ -186,11 +213,6 @@ handle_call(get_state, _From, State) ->
 %%% @complexity O(1)
 %%% @end
 %%%-------------------------------------------------------------------
-handle_cast(start, #{status := stopped} = State) ->
-    NewState = State#{status => moving},
-    io:format("~p is now moving.~n", [maps:get(name, State)]),
-    {noreply, NewState};
-
 handle_cast(stop, #{status := moving} = State) ->
     {noreply, State#{status => stopped, speed => 0}};
 
@@ -210,6 +232,13 @@ handle_cast({board_passengers, NumPassengers}, State) ->
 handle_cast({depart_passengers, NumPassengers}, State) ->
     NewPassengers = max(maps:get(passengers, State) - NumPassengers, 0),
     {noreply, State#{passengers => NewPassengers}};
+
+handle_cast(start, #{status := stopped} = State) ->
+    NewState = State#{status => moving},
+    io:format("~p is now moving.~n", [maps:get(name, State)]),
+    Position = maps:get(position, State, {0,0}),
+    report_position(Position),
+    {noreply, NewState};
 
 handle_cast(_, State) -> {noreply, State}.
 
@@ -256,8 +285,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 train_test_() ->
     {setup,
-        fun setup/0, 
-        fun teardown/1, 
+        fun setup/0,
+        fun teardown/1,
         [
             fun start_test/0,
             fun stop_test/0,
@@ -281,7 +310,7 @@ teardown(Pid) ->
 start_test() ->
     Pid = setup(),
     train:start(Pid),
-    timer:sleep(50), %% Allow state update
+    timer:sleep(50),
     State = train:get_state(Pid),
     ?assertEqual(moving, maps:get(status, State)),
     teardown(Pid).
