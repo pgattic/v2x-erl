@@ -1,0 +1,9 @@
+{application, pedestrian,
+ [
+  {description, "Pedestrian V2X Simulation"},
+  {vsn, "1.0"},
+  {modules, [pedestrian, pedestrian_sup, pedestrian_app]},
+  {registered, [pedestrian]},
+  {applications, [kernel, stdlib]},
+  {mod, {pedestrian_app, []}}
+ ]}.

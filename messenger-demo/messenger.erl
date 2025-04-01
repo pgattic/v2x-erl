@@ -1,58 +1,58 @@
--module(messenger).
--behaviour(gen_server).
+-module(traffic_light).
+-behaviour(gen_statem).
 
-%% API
--export([start_link/0, send_message/2, receive_message/1]).
+%% API Functions
+-export([start_link/0, stop/1]).
 
-%% Callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+%% gen_statem Callbacks
+-export([callback_mode/0, init/1, terminate/3, handle_event/4, code_change/3]).
 
-%% Starts the gen_server process
+%% Type Definitions
+-type state() :: red | yellow | green.
+-type event() :: timeout | stop.
+
+%% State Machine Mode
+callback_mode() ->
+    state_functions.
+
+%% Start the Traffic Light State Machine
 start_link() ->
-    gen_server:start_link({local, messenger}, messenger, [], []).
+    gen_statem:start_link(?MODULE, [], []).
 
-%% Sends a message to a remote node
-send_message(RemoteNode, Message) ->
-    %% Assumes the messenger gen_server is running on the remote node
-    gen_server:call({messenger, RemoteNode}, {send_message, Message}).
+%% Stop the State Machine
+stop(Pid) ->
+    gen_statem:cast(Pid, stop).
 
-%% Handles receiving a message
-receive_message(Pid) ->
-    gen_server:call(Pid, get_message).
-
-%% Callbacks
-
-%% Initialize the server state
+%% Initialization
 init([]) ->
-    io:format("Messenger started on ~p~n", [node()]),
-    {ok, []}.
+    io:format("Starting Traffic Light in RED state...~n"),
+    {ok, red, 5000}. %% Start in red state, timeout after 5 seconds.
 
-%% Handle synchronous calls
-handle_call({send_message, Message}, _From, State) ->
-    io:format("Received message: ~p~n", [Message]),
-    {reply, ok, State};
+%% State Handlers
+red(timeout, _From, _State) ->
+    io:format("State: RED -> Switching to GREEN~n"),
+    {next_state, green, 10000}; %% Transition to green after 10 seconds.
 
-handle_call(get_message, _From, State) ->
-    %% For simplicity, this example doesn't keep messages.
-    %% You can expand this to maintain a message queue in the State.
-    {reply, "No new messages", State};
+green(timeout, _From, _State) ->
+    io:format("State: GREEN -> Switching to YELLOW~n"),
+    {next_state, yellow, 2000}; %% Transition to yellow after 2 seconds.
 
-handle_call(_Request, _From, State) ->
-    {reply, error, State}.
+yellow(timeout, _From, _State) ->
+    io:format("State: YELLOW -> Switching to RED~n"),
+    {next_state, red, 5000}.
 
-%% Handle asynchronous messages
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+%% Handle unexpected events (or special commands like stop)
+handle_event(stop, _From, State, _Data) ->
+    io:format("Received stop command. Stopping from state: ~p~n", [State]),
+    {stop, normal, State};
+handle_event(Event, _From, State, _Data) ->
+    io:format("Unhandled event: ~p in state: ~p~n", [Event, State]),
+    {keep_state, State}. %% Ignore unrecognized events.
 
-%% Handle other messages
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-%% Cleanup on termination
-terminate(_Reason, _State) ->
+%% Other Callbacks
+terminate(_Reason, _State, _Data) ->
+    io:format("Traffic Light terminated.~n"),
     ok.
 
-%% Code change (hot upgrades)
-code_change(_OldVersion, State, _Extra) ->
+code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
