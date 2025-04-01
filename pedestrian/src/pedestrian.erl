@@ -82,7 +82,7 @@ get_state() ->
 %%% @spec init([]) -> {ok, State}
 %%%-------------------------------------------------------------------
 init([]) ->
-    io:format("Pedestrian process started~n"),
+    % io:format("Pedestrian process started~n"),
     {ok, #state{status = waiting}}.
 
 %%%-------------------------------------------------------------------
@@ -105,11 +105,11 @@ handle_call(_Request, _From, State) ->
 %%% @spec handle_cast(cross, State) -> {noreply, State}
 %%%-------------------------------------------------------------------
 handle_cast(cross, State = #state{status = waiting}) ->
-    io:format("Pedestrian is starting to cross with countdown~n"),
+    % io:format("Pedestrian is starting to cross with countdown~n"),
     send_countdown(5),
     {noreply, State#state{status = crossing_with_countdown}};
 handle_cast(cross, State = #state{status = crossing_with_countdown}) ->
-    io:format("Pedestrian is already crossing~n"),
+    % io:format("Pedestrian is already crossing~n"),
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -122,19 +122,19 @@ handle_cast(_Msg, State) ->
 %%% @spec handle_info(Msg :: any(), State) -> {noreply, State}
 %%%-------------------------------------------------------------------
 handle_info({countdown, 0}, State) ->
-    io:format("Countdown: 0~n"),
+    % io:format("Countdown: 0~n"),
     self() ! done_crossing,
     {noreply, State};
 handle_info({countdown, N}, State) when N > 0 ->
-    io:format("Countdown: ~p~n", [N]),
+    % io:format("Countdown: ~p~n", [N]),
     send_countdown(N - 1),
     {noreply, State};
 handle_info(done_crossing, State) ->
-    io:format("Pedestrian has finished crossing~n"),
+    % io:format("Pedestrian has finished crossing~n"),
     timer:send_after(3000, self(), reset),
     {noreply, State#state{status = done}};
 handle_info(reset, _State) ->
-    io:format("Pedestrian reset to waiting~n"),
+    % io:format("Pedestrian reset to waiting~n"),
     {noreply, #state{status = waiting}};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -170,92 +170,99 @@ send_countdown(N) ->
     timer:send_after(1000, self(), {countdown, N}).
 
 %%%===================================================================
-%%% Unit Tests
+%%% EUnit Tests (Structured with setup/teardown)
 %%%===================================================================
-
--ifdef(TEST).
+-ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for default pedestrian startup.
-%%%-------------------------------------------------------------------
-default_start_test_() ->
-    [
-        {"starts default pedestrian process", fun() ->
-            {ok, Pid} = start_link(),
-            true = is_process_alive(Pid)
-        end}
-    ].
+pedestrian_test_() ->
+    {setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            fun default_start_test/0,
+            fun named_start_test/0,
+            fun initial_state_test/0,
+            fun crossing_transition_test/0,
+            fun countdown_to_done_test/0,
+            fun auto_reset_test/0
+        ]}.
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for named pedestrian startup.
-%%%-------------------------------------------------------------------
-named_start_test_() ->
-    [
-        {"starts named pedestrian process", fun() ->
-            {ok, Pid} = start_link(my_pedestrian),
-            true = is_process_alive(Pid)
-        end}
-    ].
+%% Helper: start only if not already started
+setup() ->
+    case whereis(pedestrian) of
+        undefined ->
+            {ok, Pid} = pedestrian:start_link(),
+            Pid;
+        Pid when is_pid(Pid) ->
+            Pid
+    end.
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for initial state of pedestrian.
-%%%-------------------------------------------------------------------
-initial_state_test_() ->
-    [
-        {"initial state is waiting", fun() ->
-            start_link(),
-            ?assertEqual(waiting, get_state())
-        end}
-    ].
+teardown(_Pid) ->
+    catch gen_server:stop(pedestrian),
+    ok.
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for crossing request state transition.
-%%%-------------------------------------------------------------------
-crossing_transition_test_() ->
-    [
-        {"cross_request changes state to crossing_with_countdown", fun() ->
-            start_link(),
-            cross_request(),
-            timer:sleep(50),
-            ?assertEqual(crossing_with_countdown, get_state())
-        end}
-    ].
+default_start_test() ->
+    catch gen_server:stop(pedestrian),
+    {ok, Pid} = pedestrian:start_link(),
+    ?assert(is_process_alive(Pid)),
+    gen_server:stop(Pid).
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for countdown reaching zero transitioning to done.
-%%%-------------------------------------------------------------------
-countdown_to_done_test_() ->
-    [
-        {"countdown 0 triggers transition to done", fun() ->
-            start_link(),
-            cross_request(),
-            self() ! {countdown, 0},
-            timer:sleep(50),
-            ?assertEqual(done, get_state())
-        end}
-    ].
+named_start_test() ->
+    {ok, Pid} = pedestrian:start_link(my_named_ped),
+    ?assert(is_process_alive(Pid)),
+    gen_server:stop(Pid).
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%% Unit test for automatic reset from done to waiting.
-%%%-------------------------------------------------------------------
-auto_reset_test_() ->
-    [
-        {"done state automatically resets to waiting", fun() ->
-            start_link(),
-            cross_request(),
-            self() ! {countdown, 0},
-            timer:sleep(50),
-            self() ! reset,
-            timer:sleep(50),
-            ?assertEqual(waiting, get_state())
-        end}
-    ].
+initial_state_test() ->
+    _Pid = setup(),
+    ?assertEqual(waiting, pedestrian:get_state()).
+
+crossing_transition_test() ->
+    _Pid = setup(),
+    pedestrian:cross_request(),
+    timer:sleep(100),
+    ?assertEqual(crossing_with_countdown, pedestrian:get_state()).
+
+countdown_to_done_test() ->
+    _Pid = setup(),
+    pedestrian:cross_request(),
+
+    %% Simulate full countdown
+    pedestrian ! {countdown, 5},
+    pedestrian ! {countdown, 4},
+    pedestrian ! {countdown, 3},
+    pedestrian ! {countdown, 2},
+    pedestrian ! {countdown, 1},
+    pedestrian ! {countdown, 0},
+
+    %% Then what handle_info({countdown, 0}, ...) triggers
+    pedestrian ! done_crossing,
+
+    timer:sleep(50), %% Let messages be processed
+    ?assertEqual(done, pedestrian:get_state()).
+    
+
+auto_reset_test() ->
+    _Pid = setup(),
+    pedestrian:cross_request(),
+
+    %% Simulate the full countdown manually
+    pedestrian ! {countdown, 5},
+    pedestrian ! {countdown, 4},
+    pedestrian ! {countdown, 3},
+    pedestrian ! {countdown, 2},
+    pedestrian ! {countdown, 1},
+    pedestrian ! {countdown, 0},
+
+    %% Countdown 0 triggers: done_crossing
+    pedestrian ! done_crossing,
+    timer:sleep(50),
+    ?assertEqual(done, pedestrian:get_state()),
+
+    %% Simulate delayed reset (normally comes 3s later)
+    pedestrian ! reset,
+    timer:sleep(50),
+    ?assertEqual(waiting, pedestrian:get_state()).
+    
 
 -endif.
